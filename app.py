@@ -8,24 +8,14 @@ from model import predict_all
 st.set_page_config(page_title="Health AI", layout="wide")
 
 # =========================
-# CUSTOM CSS ( REAL UI BOOST)
+# UI STYLE
 # =========================
 st.markdown("""
 <style>
-.big-font {
-    font-size:28px !important;
-    font-weight: bold;
-}
 .score {
     font-size:60px !important;
     font-weight: bold;
     color: #00ffcc;
-}
-.card {
-    padding:20px;
-    border-radius:15px;
-    background-color:#111;
-    box-shadow: 0 0 10px rgba(0,0,0,0.3);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -35,11 +25,10 @@ st.markdown("""
 # =========================
 st.title("🧠 AI Health Digital Twin")
 st.markdown("### 🚀 Predict your health, understand risks & simulate improvements")
-
 st.divider()
 
 # =========================
-# INPUTS (2 COLUMN LAYOUT )
+# INPUTS
 # =========================
 col1, col2 = st.columns(2)
 
@@ -67,13 +56,13 @@ if st.button("🚀 Analyze Now"):
         'bmi': bmi
     }
 
-    risk, score, cluster = predict_all(input_data)
+    # MODEL OUTPUT
+    risk, score, cluster, risk_classes = predict_all(input_data)
 
-    risk_labels = ["Low", "Medium", "High"]
     cluster_labels = ["Sedentary", "Balanced", "Active"]
 
     # =========================
-    #  HERO SECTION (BIG SCORE)
+    # HERO SECTION
     # =========================
     st.markdown("## 📊 Your Health Summary")
 
@@ -84,15 +73,10 @@ if st.button("🚀 Analyze Now"):
         st.write("Health Score")
 
     with col2:
-        if risk == 2:
-            st.error(f"⚠ {risk_labels[risk]}")
-        elif risk == 1:
-            st.warning(f"⚠ {risk_labels[risk]}")
-        else:
-            st.success(f"✅ {risk_labels[risk]}")
+        st.success(f"⚠ Stress Level: {risk_classes[risk]}")
 
     with col3:
-        st.info(f"🧬 {cluster_labels[cluster]}")
+        st.info(f"🧬 Lifestyle: {cluster_labels[cluster]}")
 
     st.divider()
 
@@ -137,7 +121,7 @@ if st.button("🚀 Analyze Now"):
         'bmi': bmi
     }
 
-    _, new_score, _ = predict_all(new_input)
+    _, new_score, _, _ = predict_all(new_input)
 
     improvement = new_score - score
 
