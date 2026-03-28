@@ -1,17 +1,15 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
 
 # =========================
-# LOAD DATASET
+# LOAD DATA
 # =========================
 df = pd.read_csv("Sleep_health_and_lifestyle_dataset.csv")
-
-# =========================
-# CLEAN COLUMN NAMES
-# =========================
 df.columns = df.columns.str.strip()
 
 # =========================
@@ -26,28 +24,23 @@ df.rename(columns={
 }, inplace=True)
 
 # =========================
-# HANDLE BMI CATEGORY
+# HANDLE BMI
 # =========================
 bmi_map = {
     'Underweight': 18,
     'Normal': 22,
+    'Normal Weight': 22,
     'Overweight': 27,
-    'Obese': 32,
-    'Normal Weight': 22
+    'Obese': 32
 }
-
 df['bmi'] = df['bmi_category'].map(bmi_map)
 
 # =========================
 # FEATURE ENGINEERING
 # =========================
-df['screen_time'] = (
-    10 - df['sleep'] + np.random.randint(0, 3, size=len(df))
-).clip(1, 12)
+np.random.seed(42)
+df['screen_time'] = (10 - df['sleep'] + np.random.randint(0, 3, len(df))).clip(1, 12)
 
-# =========================
-# CLEAN DATA
-# =========================
 df.dropna(inplace=True)
 
 # =========================
@@ -55,8 +48,6 @@ df.dropna(inplace=True)
 # =========================
 le = LabelEncoder()
 df['stress_level'] = le.fit_transform(df['stress_level'])
-
-# Save readable labels
 risk_classes = list(le.classes_)
 
 # =========================
@@ -73,84 +64,128 @@ scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
 # =========================
+# TRAIN-TEST SPLIT
+# =========================
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42
+)
+
+# =========================
 # MODEL 1: CLASSIFICATION
 # =========================
-clf = LogisticRegression(max_iter=1000)
-clf.fit(X_scaled, y)
+clf = RandomForestClassifier(n_estimators=200, random_state=42)
+clf.fit(X_train, y_train)
 
 # =========================
-# MODEL 2: HEALTH SCORE (RULE BASED)
+# EVALUATION
 # =========================
-def calculate_health_score(input_data):
+y_pred = clf.predict(X_test)
+print("🔥 Accuracy:", accuracy_score(y_test, y_pred))
+print(classification_report(y_test, y_pred))
 
+# =========================
+# FEATURE IMPORTANCE 🔥
+# =========================
+feature_importance = dict(zip(features, clf.feature_importances_))
+
+def get_feature_importance():
+    return feature_importance
+
+# =========================
+# HEALTH SCORE (RULE-BASED)
+# =========================
+def calculate_health_score(row):
     score = 100
 
-    sleep = input_data['sleep']
-    screen = input_data['screen_time']
-    exercise = input_data['exercise']
-    diet = input_data['diet_quality']
-    bmi = input_data['bmi']
-
-    # Sleep
-    if sleep < 5:
+    if row['sleep'] < 5:
         score -= 30
-    elif sleep < 7:
+    elif row['sleep'] < 7:
         score -= 10
-    elif sleep > 9:
+    elif row['sleep'] > 9:
         score -= 5
 
-    # Screen time
-    if screen > 9:
+    if row['screen_time'] > 8:
         score -= 25
-    elif screen > 6:
+    elif row['screen_time'] > 5:
         score -= 10
 
-    # Exercise
-    if exercise == 0:
+    if row['exercise'] == 0:
         score -= 25
-    elif exercise < 2:
+    elif row['exercise'] < 2:
         score -= 10
-    elif exercise > 5:
+    elif row['exercise'] > 4:
         score += 5
 
-    # Diet
-    if diet <= 2:
+    if row['diet_quality'] <= 2:
         score -= 20
-    elif diet >= 4:
+    elif row['diet_quality'] >= 4:
         score += 5
 
-    # BMI
-    if bmi > 30:
+    if row['bmi'] > 30:
         score -= 20
-    elif bmi > 25:
+    elif row['bmi'] > 25:
         score -= 10
 
     return max(0, min(score, 100))
 
 # =========================
-# MODEL 3: CLUSTERING
+# CLUSTERING
 # =========================
 kmeans = KMeans(n_clusters=3, random_state=42)
 kmeans.fit(X_scaled)
 
 # =========================
-# PREDICT FUNCTION
+# EXPLAINABLE AI
+# =========================
+def get_reasons(input_data):
+    reasons = []
+
+    if input_data['sleep'] < 6:
+        reasons.append("Low sleep")
+    if input_data['screen_time'] > 7:
+        reasons.append("High screen time")
+    if input_data['exercise'] < 2:
+        reasons.append("Low physical activity")
+    if input_data['diet_quality'] <= 2:
+        reasons.append("Poor diet")
+    if input_data['bmi'] > 27:
+        reasons.append("High BMI")
+
+    if not reasons:
+        reasons.append("Healthy lifestyle")
+
+    return reasons
+
+# =========================
+# FINAL PREDICT FUNCTION (HYBRID AI 🔥)
 # =========================
 def predict_all(input_data):
 
     df_input = pd.DataFrame([input_data])
-
-    # Ensure correct order
     df_input = df_input[['sleep','exercise','screen_time','diet_quality','bmi']]
 
-    # Scale input
     input_scaled = scaler.transform(df_input)
 
-    # Predictions
-    risk = clf.predict(input_scaled)[0]
+    # ML prediction
+    risk_ml = clf.predict(input_scaled)[0]
+
+    # HYBRID RULE FIX
+    sleep = input_data['sleep']
+    screen = input_data['screen_time']
+    exercise = input_data['exercise']
+    diet = input_data['diet_quality']
+
+    if sleep < 5 and screen > 8:
+        risk = 2  # High
+    elif sleep < 6 or exercise < 1 or diet <= 2:
+        risk = max(risk_ml, 1)
+    else:
+        risk = risk_ml
+
+    # Rule-based score
+    score = calculate_health_score(df_input.iloc[0])
+
     cluster = kmeans.predict(input_scaled)[0]
+    reasons = get_reasons(input_data)
 
-    # Rule-based score (IMPORTANT FIX)
-    score = calculate_health_score(input_data)
-
-    return int(risk), float(score), int(cluster), risk_classes
+    return int(risk), float(score), int(cluster), reasons, risk_classes

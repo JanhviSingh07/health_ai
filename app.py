@@ -1,14 +1,11 @@
 import streamlit as st
 import pandas as pd
-from model import predict_all
+from model import predict_all, get_feature_importance
 
-# =========================
-# PAGE CONFIG
-# =========================
 st.set_page_config(page_title="Health AI", layout="wide")
 
 # =========================
-# UI STYLE
+# STYLE
 # =========================
 st.markdown("""
 <style>
@@ -33,13 +30,12 @@ st.divider()
 col1, col2 = st.columns(2)
 
 with col1:
-    sleep = st.slider("😴 Sleep Hours", 0, 10)
+    sleep = st.slider("😴 Sleep Hours (per day)", 0, 10)
     exercise = st.slider("🏃 Exercise (hours/day)", 0, 5)
-   
     diet = st.slider("🥗 Diet Quality (1-5)", 1, 5)
 
 with col2:
-    screen = st.slider("📱 Screen Time", 0, 12)
+    screen = st.slider("📱 Screen Time (hours/day)", 0, 12)
     bmi = st.slider("⚖ BMI", 15, 35)
 
 st.divider()
@@ -57,13 +53,12 @@ if st.button("🚀 Analyze Now"):
         'bmi': bmi
     }
 
-    # MODEL OUTPUT
-    risk, score, cluster, risk_classes = predict_all(input_data)
+    risk, score, cluster, reasons, risk_classes = predict_all(input_data)
 
     cluster_labels = ["Sedentary", "Balanced", "Active"]
 
     # =========================
-    # HERO SECTION
+    # RESULTS
     # =========================
     st.markdown("## 📊 Your Health Summary")
 
@@ -82,28 +77,25 @@ if st.button("🚀 Analyze Now"):
     st.divider()
 
     # =========================
-    # EXPLANATION
+    # WHY
     # =========================
     st.subheader("🧠 Why this result?")
+    for r in reasons:
+        st.write(f"👉 {r}")
 
-    reasons = []
+    # =========================
+    # FEATURE IMPORTANCE 🔥
+    # =========================
+    st.subheader("📊 What affects stress most?")
 
-    if sleep < 6:
-        reasons.append("Low sleep is increasing your risk")
-    if screen > 7:
-        reasons.append("High screen time affecting health")
-    if exercise < 2:
-        reasons.append("Lack of physical activity")
-    if diet <= 2:
-        reasons.append("Poor diet quality")
-    if bmi > 27:
-        reasons.append("High BMI contributing to risk")
+    importance = get_feature_importance()
 
-    if reasons:
-        for r in reasons:
-            st.write(f"👉 {r}")
-    else:
-        st.success("Great lifestyle balance!")
+    imp_df = pd.DataFrame({
+        "Feature": list(importance.keys()),
+        "Impact": list(importance.values())
+    })
+
+    st.bar_chart(imp_df.set_index("Feature"))
 
     # =========================
     # FUTURE SIMULATION
@@ -112,7 +104,7 @@ if st.button("🚀 Analyze Now"):
     st.subheader("🔮 Future Simulation")
 
     improved_sleep = min(sleep + 2, 10)
-    improved_exercise = min(exercise + 1, 10)
+    improved_exercise = min(exercise + 1, 5)
 
     new_input = {
         'sleep': improved_sleep,
@@ -122,7 +114,7 @@ if st.button("🚀 Analyze Now"):
         'bmi': bmi
     }
 
-    _, new_score, _, _ = predict_all(new_input)
+    _, new_score, _, _, _ = predict_all(new_input)
 
     improvement = new_score - score
 
