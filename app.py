@@ -34,7 +34,8 @@ col1, col2 = st.columns(2)
 
 with col1:
     sleep = st.slider("😴 Sleep Hours", 0, 10)
-    exercise = st.slider("🏃 Exercise (hours/week)", 0, 10)
+    exercise = st.slider("🏃 Exercise (hours/day)", 0, 5)
+   
     diet = st.slider("🥗 Diet Quality (1-5)", 1, 5)
 
 with col2:
